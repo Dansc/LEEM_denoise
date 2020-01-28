@@ -13,6 +13,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch import nn
 from nets import UNet
 
+import time
+
 torch.cuda.empty_cache()
 norm_mean = 0.0
 norm_std = 1.0
@@ -66,7 +68,7 @@ batch_size = 16
 validation_split = .2
 shuffle_dataset = True
 random_seed= 55
-amount_use = 0.4
+amount_use = 0.8
 
 # Variables for training
 num_epochs = 50
@@ -109,6 +111,7 @@ model.to(device)
 
 # specify loss function
 criterion = nn.BCELoss() # BCE loss superior to MSEloss here
+mseloss = nn.MSELoss()
 
 # specify optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -117,12 +120,17 @@ print("Length train loader: {}".format(len(train_loader)))
 print("Batchsize: {}".format(batch_size))
 print("Batchsize*train_loader: {}".format(len(train_loader)*batch_size))
 
+
+# specify optimizer
+logdir = os.path.join('runs-denoise', str(int(time.time())))
+os.mkdir(logdir)
+
 d = iter(validation_loader)
 test_data = next(d)
 test_data = test_data.to(device)
 test_noisy = add_noise(test_data, noise_level)
 grid = torchvision.utils.make_grid((test_data+2*norm_mean)*norm_std)
-writer = SummaryWriter()
+writer = SummaryWriter(log_dir=logdir)
 writer.add_image('images/testsample', grid, 0)
 grid = torchvision.utils.make_grid((test_noisy+2*norm_mean)*norm_std)
 writer.add_image('images/testsamplenoisy', grid, 0)
@@ -156,11 +164,24 @@ for n in range(num_epochs):
         train_loss += loss.item()*data.size(0)
 
     with torch.no_grad():
+        mselosses = 0.
+        for img in validation_loader:
+            img = img.to(device)
+            img_noisy = add_noise(img, noise_level).to(device)
+
+            outputs = model(img_noisy)
+            mselosses += mseloss(outputs, img).item()
+
+
         model.eval()  # Turn off dropout, batch norm to use running mean
         test = model(test_noisy)
         grid = torchvision.utils.make_grid((test+2*norm_mean)*norm_std)
         writer.add_scalar("Loss/train", train_loss, n+1)
         writer.add_image('images/test', grid, n+1)
-
-torch.save(model, 'model.pth')
+        writer.add_scalar('PSNR/valid', 10*np.log10(len(validation_loader)/mselosses), n+1)
+    if ((n+1) % 5) == 0:
+        print("Saving generator and optimizer state dicts.")
+        torch.save(model.state_dict(), os.path.join(logdir, 'model.pth'))
+        torch.save(optimizer.state_dict(), os.path.join(logdir, 'optimizer_state.pth'))
+#torch.save(model, 'model.pth')
 writer.close()

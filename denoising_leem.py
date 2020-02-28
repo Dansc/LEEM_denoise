@@ -46,7 +46,7 @@ class LEEMdataset(Dataset):
         return img
 
 def add_noise(images, noise_level):
-    n = noise_level*(torch.randn(*images.size()) - norm_mean) / norm_std
+    n = noise_level*np.random.randn()*(torch.randn(*images.size()) - norm_mean) / norm_std
     n = n.to(device)
     images = images + n
     images = torch.clamp(images, 0, 1)
@@ -68,11 +68,11 @@ batch_size = 16
 validation_split = .2
 shuffle_dataset = True
 random_seed= 55
-amount_use = 0.8
+amount_use = 0.4
 
 # Variables for training
 num_epochs = 50
-noise_level = 0.1
+noise_level = 0.2
 lr = 0.0005
 
 # Create random dataset
@@ -112,7 +112,7 @@ model.to(device)
 # specify loss function
 criterion = nn.BCELoss() # BCE loss superior to MSEloss here
 mseloss = nn.MSELoss()
-
+criterion = nn.MSELoss()
 # specify optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 

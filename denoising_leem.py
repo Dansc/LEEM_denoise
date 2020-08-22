@@ -11,8 +11,7 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch import nn
-from nets import UNet
-
+from nets import UNet, _NetD
 import time
 
 torch.cuda.empty_cache()
@@ -51,6 +50,27 @@ def add_noise(images, noise_level):
     images = images + n
     images = torch.clamp(images, 0, 1)
     return images
+
+def train_discriminator(optimizer, real_data, fake_data):
+    N = real_data.size(0)
+
+    optimizer.zero_grad()
+
+    prediction_real = discriminator(real_data)
+    error_real = criterion(prediction_real, ones_target(N))
+    # error_real.backward()
+    
+    prediction_fake = discriminator(fake_data)
+    error_fake = criterion(prediction_fake, zeros_target(N))
+    # error_fake.backward()
+
+    error = error_real/2 + error_fake/2
+    error.backward()
+
+    optimizer.step()
+
+    return error, prediction_real, prediction_fake
+
 
 # List all LEEM images
 files = os.listdir("D:\\repos\\LEEM_imgs")
@@ -109,12 +129,17 @@ model = UNet(1, 1)
 print(model)
 model.to(device)
 
+discriminator =  _NetD()
 # specify loss function
 criterion = nn.BCELoss() # BCE loss superior to MSEloss here
 mseloss = nn.MSELoss()
 criterion = nn.MSELoss()
+
+discloss = nn.BCEWithLogitsLoss()
+
 # specify optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+d_optimizer = torch.optim.Adam(model.paramters(), lr=lr)
 
 print("Length train loader: {}".format(len(train_loader)))
 print("Batchsize: {}".format(batch_size))

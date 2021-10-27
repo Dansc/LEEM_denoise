@@ -1,3 +1,6 @@
 /runs
 __pycache__/
 model.pth
+/runs-denoise
+/eval*
+bm*

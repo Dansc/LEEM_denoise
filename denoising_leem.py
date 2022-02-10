@@ -13,6 +13,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch import nn
 from nets import UNet, _NetD
 import time
+import random
 
 torch.cuda.empty_cache()
 norm_mean = 0.0
@@ -35,7 +36,7 @@ class LEEMdataset(Dataset):
 
     def __getitem__(self, idx):
         img = cv2.imread(self.datalst[idx])
-        img = img[:,:,0]
+        img = img[:600,:,0]
         if self.transforms:
             img = PIL.Image.fromarray(img)
             img = self.transforms(img)
@@ -73,10 +74,11 @@ def train_discriminator(optimizer, real_data, fake_data):
 
 
 # List all LEEM images
-files = os.listdir("D:\\repos\\LEEM_imgs")
-files = [os.path.join("D:\\repos\\LEEM_imgs", f) for f in files if f.endswith('png')]
+files = os.listdir("E:\\Dschwa\\LEEM_imgs")
+files = [os.path.join("E:\\Dschwa\\LEEM_imgs", f) for f in files if f.endswith('png')]
 
 
+#transforms.CenterCrop((768, 900)), 
 trans = transforms.Compose([transforms.RandomCrop(128),
                             transforms.ToTensor(),
                             transforms.Normalize((norm_mean,), (norm_std, ))
@@ -139,7 +141,7 @@ discloss = nn.BCEWithLogitsLoss()
 
 # specify optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-d_optimizer = torch.optim.Adam(model.paramters(), lr=lr)
+d_optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 print("Length train loader: {}".format(len(train_loader)))
 print("Batchsize: {}".format(batch_size))
@@ -154,6 +156,7 @@ d = iter(validation_loader)
 test_data = next(d)
 test_data = test_data.to(device)
 test_noisy = add_noise(test_data, noise_level)
+print(test_data.shape)
 grid = torchvision.utils.make_grid((test_data+2*norm_mean)*norm_std)
 writer = SummaryWriter(log_dir=logdir)
 writer.add_image('images/testsample', grid, 0)
